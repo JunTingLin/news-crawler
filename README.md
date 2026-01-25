@@ -19,11 +19,11 @@ pip install -r requirements.txt
 cp .env.example .env  # Add your API keys
 
 # Run pipeline
-python scripts/crawl_news.py --category tw_stock --start 2024 --end 2025
-python scripts/filter_stocks.py --category tw_stock --start 2024-01-01 --end 2024-12-31 --stock 2330
-python scripts/split_by_trading_day.py --stock 2330
+python scripts/crawl_news.py --category tw_stock --start 2024-01-01 --end 2025-12-31
+python scripts/filter_stocks.py --category tw_stock --start 2024-01-01 --end 2025-12-31 --stock 2330
+python scripts/split_by_trading_day.py --stock 2330 --start 2025-01-01 --end 2025-12-31
 python scripts/analyze_trading_day.py --stock 2330
-python scripts/summarize_by_llm.py --stock 2330
+python scripts/summarize_by_llm.py --stock 2330 --start 2025-01-01 --end 2025-12-31
 ```
 
 ## Scripts
@@ -58,17 +58,17 @@ data/
 
 ### crawl_news.py
 ```bash
-python scripts/crawl_news.py --category tw_stock --start 2024 --end 2025
+python scripts/crawl_news.py --category tw_stock --start 2024-01-01 --end 2025-12-31
 ```
 
 ### filter_stocks.py
 ```bash
-python scripts/filter_stocks.py --category tw_stock --start 2024-01-01 --end 2024-12-31 --stock 2330
+python scripts/filter_stocks.py --category tw_stock --start 2024-01-01 --end 2025-12-31 --stock 2330
 ```
 
 ### split_by_trading_day.py
 ```bash
-python scripts/split_by_trading_day.py --stock 2330
+python scripts/split_by_trading_day.py --stock 2330 --start 2025-01-01 --end 2025-12-31
 ```
 
 ### analyze_trading_day.py
@@ -78,8 +78,7 @@ python scripts/analyze_trading_day.py --stock 2330 --threshold 15
 
 ### summarize_by_llm.py
 ```bash
-python scripts/summarize_by_llm.py --stock 2330
-python scripts/summarize_by_llm.py --stock 2330 --start 2024-01-01 --end 2024-01-31
+python scripts/summarize_by_llm.py --stock 2330 --start 2025-01-01 --end 2025-12-31
 python scripts/summarize_by_llm.py --stock 2330 --dry-run  # Preview without API calls
 ```
 

@@ -7,8 +7,8 @@ Crawls news from cnyes.com and saves to data/raw/{category}/YYYY/MM/YYYYMMDD.jso
 Supports resuming from interruption by checking existing files.
 
 Usage:
-    python scripts/crawl_news.py --category tw_stock --start 2015 --end 2025
-    python scripts/crawl_news.py --category us_stock --start 2024 --end 2025
+    python scripts/crawl_news.py --category tw_stock --start 2024-01-01 --end 2025-12-31
+    python scripts/crawl_news.py --category us_stock --start 2024-01-01 --end 2024-12-31
 """
 
 import sys
@@ -28,13 +28,11 @@ from cnyes_crawler import CnyesCrawler
 CATEGORY_CONFIG = {
     'tw_stock': {
         'name': 'Taiwan Stock News',
-        'default_start': 2015,
-        'default_end': datetime.now().year
+        'default_start': '2015-01-01',
     },
     'us_stock': {
         'name': 'US Stock News',
-        'default_start': 2020,
-        'default_end': datetime.now().year
+        'default_start': '2020-01-01',
     },
 }
 
@@ -60,15 +58,15 @@ def check_file_exists(data_dir, category, date_str):
     return file_path.exists()
 
 
-def get_missing_dates(data_dir, category, start_year, end_year):
+def get_missing_dates(data_dir, category, start_date, end_date):
     """
-    Get list of missing dates that need to be crawled
+    Get list of missing months that need to be crawled
 
     Args:
         data_dir: Base data directory
         category: News category
-        start_year: Start year
-        end_year: End year
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD)
 
     Returns:
         list: List of (year, month) tuples that need crawling
@@ -76,17 +74,31 @@ def get_missing_dates(data_dir, category, start_year, end_year):
     missing_months = []
     now = datetime.now()
 
-    for year in range(start_year, end_year + 1):
-        for month in range(1, 13):
-            # Skip future months
-            if year == now.year and month > now.month:
-                continue
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
-            # Check if any file exists for this month
-            first_day = f"{year}-{month:02d}-01"
+    current = datetime(start_dt.year, start_dt.month, 1)
+    end_month = datetime(end_dt.year, end_dt.month, 1)
 
-            if not check_file_exists(data_dir, category, first_day):
-                missing_months.append((year, month))
+    while current <= end_month:
+        year = current.year
+        month = current.month
+
+        # Skip future months
+        if current > now:
+            break
+
+        # Check if any file exists for this month
+        first_day = f"{year}-{month:02d}-01"
+
+        if not check_file_exists(data_dir, category, first_day):
+            missing_months.append((year, month))
+
+        # Move to next month
+        if month == 12:
+            current = datetime(year + 1, 1, 1)
+        else:
+            current = datetime(year, month + 1, 1)
 
     return missing_months
 
@@ -151,8 +163,10 @@ def main():
     parser.add_argument('--category', type=str, default='tw_stock',
                         choices=['tw_stock', 'us_stock'],
                         help='News category (default: tw_stock)')
-    parser.add_argument('--start', type=int, help='Start year')
-    parser.add_argument('--end', type=int, help='End year')
+    parser.add_argument('--start', type=str,
+                        help='Start date (YYYY-MM-DD)')
+    parser.add_argument('--end', type=str,
+                        help='End date (YYYY-MM-DD)')
     parser.add_argument('--data-dir', type=str, default='data',
                         help='Data directory (default: data)')
     parser.add_argument('--force', action='store_true',
@@ -160,17 +174,21 @@ def main():
 
     args = parser.parse_args()
 
-    # Get default years from config
+    # Get default dates from config
     config = CATEGORY_CONFIG.get(args.category, {})
-    start_year = args.start or config.get('default_start', 2015)
-    end_year = args.end or config.get('default_end', datetime.now().year)
+    start_date = args.start or config.get('default_start', '2015-01-01')
+    end_date = args.end or datetime.now().strftime("%Y-%m-%d")
+
+    # Parse dates for display
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
     print("╔" + "="*78 + "╗")
     print("║" + " "*25 + "News Crawler" + " "*25 + "║")
     print("╚" + "="*78 + "╝")
     print()
     print(f"Category: {args.category} ({config.get('name', 'Unknown')})")
-    print(f"Time range: {start_year} - {end_year}")
+    print(f"Date range: {start_date} ~ {end_date}")
     print(f"Data directory: {args.data_dir}")
     print(f"Resume mode: {'Disabled (--force)' if args.force else 'Enabled'}")
     print()
@@ -181,12 +199,19 @@ def main():
     # Get missing months or all months (if --force)
     if args.force:
         print("Force mode: Re-crawling all months")
-        missing_months = [(year, month)
-                         for year in range(start_year, end_year + 1)
-                         for month in range(1, 13)
-                         if year < datetime.now().year or month <= datetime.now().month]
+        missing_months = []
+        current = datetime(start_dt.year, start_dt.month, 1)
+        end_month = datetime(end_dt.year, end_dt.month, 1)
+        now = datetime.now()
+
+        while current <= end_month and current <= now:
+            missing_months.append((current.year, current.month))
+            if current.month == 12:
+                current = datetime(current.year + 1, 1, 1)
+            else:
+                current = datetime(current.year, current.month + 1, 1)
     else:
-        missing_months = get_missing_dates(args.data_dir, args.category, start_year, end_year)
+        missing_months = get_missing_dates(args.data_dir, args.category, start_date, end_date)
 
         if not missing_months:
             print("✓ All months already crawled! Nothing to do.")
@@ -244,8 +269,8 @@ def main():
     # Save summary
     summary = {
         "category": args.category,
-        "start_year": start_year,
-        "end_year": end_year,
+        "start_date": start_date,
+        "end_date": end_date,
         "total_months": len(missing_months),
         "total_news": total_news,
         "total_days": total_days,
@@ -255,7 +280,7 @@ def main():
 
     summary_dir = Path(args.data_dir)
     summary_dir.mkdir(exist_ok=True)
-    summary_file = summary_dir / f"crawl_summary_{args.category}_{start_year}_{end_year}.json"
+    summary_file = summary_dir / f"crawl_summary_{args.category}_{start_dt.year}_{end_dt.year}.json"
 
     with open(summary_file, 'w', encoding='utf-8') as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
