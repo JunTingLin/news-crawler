@@ -6,58 +6,57 @@ Split Stock News by Trading Day
 Splits filtered stock news into individual JSON files per trading day.
 Each trading day file contains news from previous day's close (13:30) to current day's open (09:00).
 
-Uses finlab API to get actual Taiwan stock trading days.
+Uses Yahoo Finance to get trading days (^TWII for Taiwan, ^DJIA for US, etc.)
 
 Usage:
     python scripts/split_by_trading_day.py --stock 2330
     python scripts/split_by_trading_day.py --stock 2330 --start 2024-01-01 --end 2024-12-31
+    python scripts/split_by_trading_day.py --stock AAPL --category us_stock --index ^DJIA
 """
 
 import sys
-import os
 import argparse
 import json
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, date
 from pathlib import Path
 
-from dotenv import load_dotenv
-import finlab
-from finlab import data
-
-# Load .env file
-load_dotenv()
+import yfinance as yf
 
 
-# Trading hours
+# Default index for each category
+DEFAULT_INDEX = {
+    'tw_stock': '^TWII',
+    'us_stock': '^DJIA',
+}
+
+# Trading hours (Taiwan market)
 MARKET_CLOSE_TIME = time(13, 30)  # 13:30
 MARKET_OPEN_TIME = time(9, 0)     # 09:00
 
 
-def get_trading_days(start_date: str, end_date: str) -> list:
+def get_trading_days(index_symbol: str, start_date: str, end_date: str) -> list:
     """
-    Get list of Taiwan stock trading days using finlab API
+    Get list of trading days using Yahoo Finance
 
     Args:
+        index_symbol: Index symbol (e.g., ^TWII, ^DJIA)
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
 
     Returns:
         list: List of trading day dates (datetime.date objects)
     """
-    # Get close price data to extract trading days
-    close = data.get('price:收盤價')
-
-    # Filter by date range
-    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    ticker = yf.Ticker(index_symbol)
+    # Add one day to end_date since yfinance end is exclusive
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+    end_date_plus1 = end_dt.strftime("%Y-%m-%d")
+    hist = ticker.history(start=start_date, end=end_date_plus1)
 
     trading_days = []
-    for ts in close.index:
-        dt = ts.to_pydatetime()
-        if start_dt <= dt <= end_dt:
-            trading_days.append(dt.date())
+    for ts in hist.index:
+        trading_days.append(ts.to_pydatetime().date())
 
-    return sorted(trading_days)
+    return sorted(set(trading_days))
 
 
 def load_stock_news(data_dir: str, category: str, stock_code: str) -> list:
@@ -111,7 +110,7 @@ def parse_publish_time(publish_time: str) -> datetime:
     return datetime.strptime(publish_time, "%Y-%m-%d %H:%M:%S")
 
 
-def get_news_window(trading_day, prev_trading_day):
+def get_news_window(trading_day: date, prev_trading_day: date):
     """
     Calculate the news collection window for a trading day
 
@@ -163,7 +162,7 @@ def filter_news_for_trading_day(all_news: list, start_dt: datetime, end_dt: date
     return filtered
 
 
-def save_trading_day_news(output_dir: Path, trading_day, news_list: list,
+def save_trading_day_news(output_dir: Path, trading_day: date, news_list: list,
                           start_dt: datetime, end_dt: datetime) -> str:
     """
     Save news for a trading day
@@ -202,9 +201,8 @@ def save_trading_day_news(output_dir: Path, trading_day, news_list: list,
 def main():
     parser = argparse.ArgumentParser(description='Split stock news by trading day')
     parser.add_argument('--stock', type=str, required=True,
-                        help='Stock code (e.g., 2330)')
+                        help='Stock code (e.g., 2330, AAPL)')
     parser.add_argument('--category', type=str, default='tw_stock',
-                        choices=['tw_stock'],
                         help='News category (default: tw_stock)')
     parser.add_argument('--start', type=str,
                         help='Start date (YYYY-MM-DD), default: earliest news date')
@@ -212,21 +210,18 @@ def main():
                         help='End date (YYYY-MM-DD), default: latest news date')
     parser.add_argument('--data-dir', type=str, default='data',
                         help='Data directory (default: data)')
-    parser.add_argument('--finlab-key', type=str,
-                        default=os.getenv('FINLAB_API_KEY'),
-                        help='Finlab API key (default: from FINLAB_API_KEY env var)')
+    parser.add_argument('--index', type=str,
+                        help='Index symbol for trading days (default: ^TWII for tw_stock, ^DJIA for us_stock)')
 
     args = parser.parse_args()
 
-    print("╔" + "="*78 + "╗")
-    print("║" + " "*20 + "Split News by Trading Day" + " "*20 + "║")
-    print("╚" + "="*78 + "╝")
-    print()
+    # Determine index symbol
+    index_symbol = args.index if args.index else DEFAULT_INDEX.get(args.category, '^TWII')
 
-    # Login to finlab
-    print("Logging in to finlab...")
-    finlab.login(args.finlab_key)
-    print("✓ Logged in successfully")
+    print("=" * 60)
+    print(f"Split News by Trading Day - {args.stock}")
+    print("=" * 60)
+    print(f"Trading day index: {index_symbol}")
     print()
 
     # Load stock news
@@ -237,7 +232,7 @@ def main():
         print("No news found. Please run filter_stocks.py first.")
         return
 
-    print(f"✓ Loaded {len(all_news):,} articles total")
+    print(f"Loaded {len(all_news):,} articles total")
     print()
 
     # Determine date range from news if not specified
@@ -263,11 +258,11 @@ def main():
     print(f"Processing range: {start_date} to {end_date}")
     print()
 
-    # Get trading days
-    print("Fetching trading days from finlab...")
+    # Get trading days from Yahoo Finance
+    print(f"Fetching trading days from Yahoo Finance ({index_symbol})...")
     # Extend start date to get previous trading day for first window
     extended_start = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=10)).strftime("%Y-%m-%d")
-    trading_days = get_trading_days(extended_start, end_date)
+    trading_days = get_trading_days(index_symbol, extended_start, end_date)
 
     # Filter to requested range
     start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -275,19 +270,17 @@ def main():
 
     filtered_trading_days = [d for d in trading_days if start_dt <= d <= end_dt]
 
-    print(f"✓ Found {len(filtered_trading_days)} trading days in range")
+    print(f"Found {len(filtered_trading_days)} trading days in range")
     print()
 
     # Create output directory
-    output_dir = Path(args.data_dir) / "stocks" / args.category / args.stock / "by_trading_day"
+    output_dir = Path(args.data_dir) / "stocks" / args.category / "by_trading_day" / args.stock
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Output directory: {output_dir}")
     print()
 
     # Process each trading day
-    print("="*80)
     print("Processing trading days...")
-    print("="*80)
 
     stats = {
         "total_days": len(filtered_trading_days),
@@ -312,27 +305,23 @@ def main():
         day_news = filter_news_for_trading_day(all_news, start_window, end_window)
 
         # Save
-        file_path = save_trading_day_news(output_dir, trading_day, day_news, start_window, end_window)
+        save_trading_day_news(output_dir, trading_day, day_news, start_window, end_window)
 
         if day_news:
             stats["days_with_news"] += 1
             stats["total_articles"] += len(day_news)
-            status = f"✓ {len(day_news):3d} articles"
-        else:
-            stats["days_without_news"] += 1
-            status = "  (no news)"
 
-        # Progress output (every 50 days or if has news)
-        if (i + 1) % 50 == 0 or day_news:
-            window_str = f"{start_window.strftime('%m/%d %H:%M')} ~ {end_window.strftime('%m/%d %H:%M')}"
-            print(f"  {trading_day} [{window_str}]: {status}")
+        # Progress output every 100 days
+        if (i + 1) % 100 == 0:
+            print(f"  Processed {i + 1}/{len(filtered_trading_days)} trading days...")
 
     # Summary
     print()
-    print("="*80)
+    print("=" * 60)
     print("Summary")
-    print("="*80)
+    print("=" * 60)
     print(f"Stock: {args.stock}")
+    print(f"Index: {index_symbol}")
     print(f"Date range: {start_date} to {end_date}")
     print(f"Trading days processed: {stats['total_days']}")
     print(f"Days with news: {stats['days_with_news']}")
@@ -340,7 +329,7 @@ def main():
     print(f"Total articles saved: {stats['total_articles']}")
     print(f"Output directory: {output_dir}")
     print()
-    print("✓ Done!")
+    print("Done!")
 
 
 if __name__ == "__main__":

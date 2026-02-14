@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Summarize Trading Day News with LLM
+Summarize Trading Day News with LLM (V2 - One Sentence)
 
-Uses OpenAI API to generate daily news summaries for each trading day.
+Uses OpenAI API to generate one-sentence daily news summaries.
+Focuses on news directly related to the specific stock.
 
 Usage:
-    python scripts/summarize_by_llm.py --stock 2330
-    python scripts/summarize_by_llm.py --stock 2330 --start 2024-01-01 --end 2024-01-31
+    python scripts/summarize_by_llm_v2.py --stock 2330
+    python scripts/summarize_by_llm_v2.py --stock 2330 --start 2024-01-01 --end 2024-01-31
 """
 
 import sys
@@ -25,24 +26,20 @@ import tiktoken
 load_dotenv()
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是一位專業的財經新聞編輯。你的任務是將多篇新聞整合成一段客觀的事實陳述，專注於 {stock_id} 相關的內容。
+SYSTEM_PROMPT_TEMPLATE = """你是一位專業的財經新聞編輯。你的任務是用一句話總結與 {stock_id} 直接相關的新聞重點。
 
-請遵循以下規則：
+規則：
 1. 使用繁體中文
-2. 將所有新聞的事實整合成一個連貫的段落，重點放在與 {stock_id} 相關的資訊
-3. 只陳述新聞中的事實，不加入個人觀點、評論或情感
-4. 如果多篇新聞提到相同事件，合併陳述；如果有矛盾，並列呈現
-5. 輸出為一到三個段落的純文字，不使用條列格式"""
+2. 只提取與 {stock_id} 直接相關的資訊（如：該公司的營收、產品、人事、合作、法說會等）
+3. 忽略僅提及該股票代號但內容不相關的新聞
+4. 輸出一句簡潔的事實陳述，不超過50字
+5. 如果沒有與該股票直接相關的新聞，回覆「無」"""
 
-USER_PROMPT_TEMPLATE = """以下是 {stock_code} 在 {trading_day} 交易日開盤前的相關新聞。
-新聞時間範圍：{news_window_start} 至 {news_window_end}
+USER_PROMPT_TEMPLATE = """以下是 {stock_code} 在 {trading_day} 的相關新聞標題：
 
-請將這些新聞整合成客觀的事實陳述：
+{news_titles}
 
-{news_content}
-
----
-請輸出整合後的事實摘要："""
+請用一句話總結與 {stock_code} 直接相關的新聞重點："""
 
 
 def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
@@ -51,28 +48,20 @@ def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
     return len(encoder.encode(text))
 
 
-def format_news_for_prompt(news_list: list, max_chars_per_article: int = 500) -> str:
-    """Format news articles for the prompt"""
-    formatted = []
-
-    for i, article in enumerate(news_list, 1):
+def format_news_titles(news_list: list) -> str:
+    """Format news titles for the prompt"""
+    titles = []
+    for article in news_list:
         title = article.get('title', '').strip()
-        content = article.get('content', '').strip()
-        publish_time = article.get('publish_time', '')
-
-        # Truncate content if too long
-        if len(content) > max_chars_per_article:
-            content = content[:max_chars_per_article] + "..."
-
-        formatted.append(f"【新聞 {i}】({publish_time})\n標題：{title}\n內容：{content}")
-
-    return "\n\n".join(formatted)
+        if title:
+            titles.append(f"- {title}")
+    return "\n".join(titles)
 
 
 def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
-                          day_data: dict, max_tokens: int = 1000) -> dict:
+                          day_data: dict, max_tokens: int = 100) -> dict:
     """
-    Summarize news for a single trading day
+    Summarize news for a single trading day with one sentence
 
     Returns:
         dict with summary and metadata
@@ -84,14 +73,14 @@ def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
     if not news_list:
         return {
             'trading_day': trading_day,
-            'summary': '當日無相關新聞',
+            'summary': '無',
             'news_count': 0,
             'input_tokens': 0,
             'output_tokens': 0
         }
 
-    # Format news content
-    news_content = format_news_for_prompt(news_list)
+    # Format news titles only (not full content)
+    news_titles = format_news_titles(news_list)
 
     # Build system prompt with stock_id
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(stock_id=stock_code)
@@ -100,9 +89,7 @@ def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
     user_prompt = USER_PROMPT_TEMPLATE.format(
         stock_code=stock_code,
         trading_day=trading_day,
-        news_window_start=news_window.get('start', ''),
-        news_window_end=news_window.get('end', ''),
-        news_content=news_content
+        news_titles=news_titles
     )
 
     # Count input tokens
@@ -159,7 +146,7 @@ def load_trading_day_files(data_dir: str, category: str, stock_code: str,
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Summarize trading day news with LLM')
+    parser = argparse.ArgumentParser(description='Summarize trading day news with LLM (one sentence)')
     parser.add_argument('--stock', type=str, required=True,
                         help='Stock code (e.g., 2330)')
     parser.add_argument('--category', type=str, default='tw_stock',
@@ -172,8 +159,8 @@ def main():
                         help='Data directory (default: data)')
     parser.add_argument('--model', type=str, default='gpt-4o-mini',
                         help='OpenAI model (default: gpt-4o-mini)')
-    parser.add_argument('--max-tokens', type=int, default=1000,
-                        help='Max output tokens per summary (default: 1000)')
+    parser.add_argument('--max-tokens', type=int, default=100,
+                        help='Max output tokens per summary (default: 100)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be processed without calling API')
     parser.add_argument('--force', action='store_true',
@@ -182,7 +169,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 60)
-    print(f"LLM News Summarizer - {args.stock}")
+    print(f"LLM News Summarizer V2 (One Sentence) - {args.stock}")
     print("=" * 60)
     print()
 
@@ -204,7 +191,7 @@ def main():
 
     if not files:
         print("No trading day files found.")
-        print("Please run split_by_trading_day.py first.")
+        print("Please run split_by_trading_day_v2.py first.")
         return
 
     print(f"Found {len(files)} trading days to process")
@@ -218,7 +205,7 @@ def main():
         return
 
     # Create output directory
-    output_dir = Path(args.data_dir) / "stocks" / args.category / "summaries" / args.stock
+    output_dir = Path(args.data_dir) / "stocks" / args.category / "summaries_v2" / args.stock
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Process each trading day
@@ -231,7 +218,6 @@ def main():
         # Check if already summarized
         output_file = output_dir / json_file.name
         if output_file.exists() and not args.force:
-            print(f"  {json_file.stem}: already exists, skipping")
             skipped += 1
             continue
 
@@ -239,7 +225,8 @@ def main():
         with open(json_file, 'r', encoding='utf-8') as f:
             day_data = json.load(f)
 
-        print(f"  {json_file.stem}: {day_data.get('news_count', 0)} articles...", end=" ", flush=True)
+        news_count = day_data.get('news_count', 0)
+        print(f"  {json_file.stem}: {news_count} articles...", end=" ", flush=True)
 
         try:
             # Summarize
@@ -255,7 +242,11 @@ def main():
             total_output_tokens += result.get('output_tokens', 0)
             processed += 1
 
-            print(f"done ({result.get('input_tokens', 0)} + {result.get('output_tokens', 0)} tokens)")
+            # Show summary inline
+            summary = result.get('summary', '')
+            if len(summary) > 40:
+                summary = summary[:40] + "..."
+            print(f"'{summary}'")
 
         except Exception as e:
             print(f"error: {e}")

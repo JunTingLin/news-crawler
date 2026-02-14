@@ -40,7 +40,7 @@ def load_trading_day_data(data_dir: str, category: str, stock_code: str, model: 
     Returns:
         list: List of dicts with date, news_count, total_tokens
     """
-    trading_day_dir = Path(data_dir) / "stocks" / category / stock_code / "by_trading_day"
+    trading_day_dir = Path(data_dir) / "stocks" / category / "by_trading_day" / stock_code
 
     if not trading_day_dir.exists():
         print(f"Directory not found: {trading_day_dir}")
