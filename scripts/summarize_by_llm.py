@@ -25,15 +25,14 @@ import tiktoken
 load_dotenv()
 
 
-SYSTEM_PROMPT = """你是一位專業的財經新聞編輯。你的任務是將多篇新聞整合成一段客觀的事實陳述。
+SYSTEM_PROMPT_TEMPLATE = """你是一位專業的財經新聞編輯。你的任務是將多篇新聞整合成一段客觀的事實陳述，專注於 {stock_id} 相關的內容。
 
 請遵循以下規則：
 1. 使用繁體中文
-2. 將所有新聞的事實整合成一個連貫的段落
+2. 將所有新聞的事實整合成一個連貫的段落，重點放在與 {stock_id} 相關的資訊
 3. 只陳述新聞中的事實，不加入個人觀點、評論或情感
 4. 如果多篇新聞提到相同事件，合併陳述；如果有矛盾，並列呈現
-5. 忽略廣告性質的內容
-6. 輸出為一到三個段落的純文字，不使用條列格式"""
+5. 輸出為一到三個段落的純文字，不使用條列格式"""
 
 USER_PROMPT_TEMPLATE = """以下是 {stock_code} 在 {trading_day} 交易日開盤前的相關新聞。
 新聞時間範圍：{news_window_start} 至 {news_window_end}
@@ -94,6 +93,9 @@ def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
     # Format news content
     news_content = format_news_for_prompt(news_list)
 
+    # Build system prompt with stock_id
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(stock_id=stock_code)
+
     # Build user prompt
     user_prompt = USER_PROMPT_TEMPLATE.format(
         stock_code=stock_code,
@@ -104,13 +106,13 @@ def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
     )
 
     # Count input tokens
-    input_tokens = count_tokens(SYSTEM_PROMPT + user_prompt, model)
+    input_tokens = count_tokens(system_prompt + user_prompt, model)
 
     # Call OpenAI API
     response = client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
         max_tokens=max_tokens,
@@ -174,6 +176,8 @@ def main():
                         help='Max output tokens per summary (default: 1000)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be processed without calling API')
+    parser.add_argument('--force', action='store_true',
+                        help='Force re-summarize existing files')
 
     args = parser.parse_args()
 
@@ -226,7 +230,7 @@ def main():
     for json_file in files:
         # Check if already summarized
         output_file = output_dir / json_file.name
-        if output_file.exists():
+        if output_file.exists() and not args.force:
             print(f"  {json_file.stem}: already exists, skipping")
             skipped += 1
             continue

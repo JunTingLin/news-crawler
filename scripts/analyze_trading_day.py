@@ -127,6 +127,18 @@ def print_statistics(data: list, threshold: int, model: str):
     else:
         print(f"No days exceed threshold of {threshold} articles.")
 
+    # Find days with zero news
+    zero_news_days = [d for d in data if d['news_count'] == 0]
+
+    print()
+    if zero_news_days:
+        print(f"Days with 0 news articles ({len(zero_news_days)} days):")
+        print("-" * 60)
+        for d in sorted(zero_news_days, key=lambda x: x['date']):
+            print(f"  {d['date'].strftime('%Y-%m-%d')}")
+    else:
+        print("All trading days have at least 1 news article.")
+
 
 def plot_news_distribution(data: list, stock_code: str, output_path: Path, threshold: int):
     """Generate bar chart of news distribution"""
@@ -141,7 +153,9 @@ def plot_news_distribution(data: list, stock_code: str, output_path: Path, thres
 
     fig, ax = plt.subplots(figsize=(14, 6))
 
-    ax.bar(dates, counts, color=colors, width=0.8)
+    # Use index as x-axis (categorical) to avoid gaps for non-trading days
+    x_positions = range(len(dates))
+    ax.bar(x_positions, counts, color=colors, width=0.8)
 
     # Add threshold line
     ax.axhline(y=threshold, color='red', linestyle='--', linewidth=1, label=f'Threshold ({threshold})')
@@ -151,10 +165,20 @@ def plot_news_distribution(data: list, stock_code: str, output_path: Path, thres
     ax.set_ylabel('News Count')
     ax.set_title(f'News Distribution by Trading Day - {stock_code}')
 
-    # Date formatting
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    plt.xticks(rotation=45, ha='right')
+    # Set x-axis labels to show month boundaries
+    # Find indices where month changes
+    month_labels = []
+    month_positions = []
+    prev_month = None
+    for i, d in enumerate(dates):
+        month_key = d.strftime('%Y-%m')
+        if month_key != prev_month:
+            month_labels.append(month_key)
+            month_positions.append(i)
+            prev_month = month_key
+
+    ax.set_xticks(month_positions)
+    ax.set_xticklabels(month_labels, rotation=45, ha='right')
 
     ax.legend()
     ax.grid(axis='y', alpha=0.3)
