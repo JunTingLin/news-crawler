@@ -70,6 +70,16 @@ US_STOCKS = {
     "AMZN": ["AMZN"],
 }
 
+# Title keywords to exclude (table-type articles with massive content)
+EXCLUDE_TITLE_KEYWORDS = [
+    "一覽表",
+    "淨值表",
+    "[表一",
+    "[表二",
+    "[表三",
+    "基金淨值",
+]
+
 
 def load_news_from_date(data_dir, category, date_str):
     """
@@ -136,6 +146,23 @@ def load_news_range(data_dir, category, start_date, end_date):
     return all_news
 
 
+def should_exclude_article(article):
+    """
+    Check if article should be excluded based on title keywords
+
+    Args:
+        article: News article dict
+
+    Returns:
+        bool: True if should be excluded
+    """
+    title = article.get('title', '')
+    for keyword in EXCLUDE_TITLE_KEYWORDS:
+        if keyword in title:
+            return True
+    return False
+
+
 def filter_by_stock(crawler, all_news, keywords_list):
     """
     Filter news by stock keywords
@@ -150,6 +177,14 @@ def filter_by_stock(crawler, all_news, keywords_list):
     """
     # Filter news using the provided keywords list
     filtered = crawler.filter_news(all_news, keywords_list)
+
+    # Exclude table-type articles
+    original_count = len(filtered)
+    filtered = [article for article in filtered if not should_exclude_article(article)]
+    excluded_count = original_count - len(filtered)
+
+    if excluded_count > 0:
+        print(f"  (excluded {excluded_count} table-type articles)")
 
     return filtered
 

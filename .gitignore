@@ -45,5 +45,6 @@ cookies.txt
 
 # Data directories
 data/
+data_origin
 *.json
 *.parquet

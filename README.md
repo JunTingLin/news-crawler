@@ -48,6 +48,8 @@ python scripts/summarize_by_llm.py --stock 2330 --start 2025-01-01 --end 2025-12
 |--------|-------------|
 | `batch_filter_stocks.sh` | Filter all 29 TWII component stocks |
 | `batch_split_trading_day_v2.sh` | Split all 29 stocks by trading day |
+| `batch_analyze_trading_day.sh` | Analyze news distribution for all 29 stocks |
+| `batch_summarize_by_llm_v2.sh` | Summarize all 29 stocks with LLM (one sentence) |
 
 ## Data Structure
 
@@ -60,8 +62,12 @@ data/
     ├── 1216/                        # Filtered stock news
     │   └── 201601_202512.json
     ├── 2330/
-    │   ├── 201601_202512.json
-    │   └── news_distribution.png    # Analysis chart
+    │   └── 201601_202512.json
+    ├── analysis/                    # Analysis charts
+    │   ├── 1216/
+    │   │   └── news_distribution.png
+    │   └── 2330/
+    │       └── news_distribution.png
     ├── by_trading_day/              # Split by trading day
     │   ├── 1216/
     │   │   ├── 2024-01-02.json
