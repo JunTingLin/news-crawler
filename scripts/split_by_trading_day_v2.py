@@ -25,8 +25,107 @@ from collections import defaultdict
 import yfinance as yf
 from dotenv import load_dotenv
 
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.filter_stocks import TWII_STOCKS
+
 # Load environment variables
 load_dotenv()
+
+
+def get_stock_name(stock_code: str) -> str:
+    """Get stock name from TWII_STOCKS, fallback to stock_code"""
+    if stock_code in TWII_STOCKS:
+        include_list, _ = TWII_STOCKS[stock_code]
+        return include_list[0] if include_list else stock_code
+    return stock_code
+
+
+def extract_context_around_keyword(content: str, keywords: list, context_chars: int = 150) -> str:
+    """
+    Extract text around keyword occurrences in content.
+
+    Args:
+        content: Full article content
+        keywords: List of keywords to search for (e.g., ['台積電', '2330'])
+        context_chars: Number of characters before and after keyword
+
+    Returns:
+        Extracted context string, or empty string if no keyword found
+    """
+    content_lower = content.lower()
+    found_positions = []
+
+    for keyword in keywords:
+        keyword_lower = keyword.lower()
+        pos = 0
+        while True:
+            pos = content_lower.find(keyword_lower, pos)
+            if pos == -1:
+                break
+            found_positions.append((pos, len(keyword)))
+            pos += 1
+
+    if not found_positions:
+        return ""
+
+    # Sort by position
+    found_positions.sort()
+
+    # Extract context for first occurrence (most relevant)
+    pos, keyword_len = found_positions[0]
+    start = max(0, pos - context_chars)
+    end = min(len(content), pos + keyword_len + context_chars)
+
+    snippet = content[start:end]
+
+    # Add ellipsis if truncated
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(content):
+        snippet = snippet + "..."
+
+    return snippet
+
+
+def add_extracted_content(news_list: list, stock_code: str, context_chars: int = 150) -> list:
+    """
+    Add extracted_content field to each news article.
+
+    Args:
+        news_list: List of news articles
+        stock_code: Stock code (e.g., '2330')
+        context_chars: Characters before/after keyword
+
+    Returns:
+        List with extracted_content added to each article
+    """
+    stock_name = get_stock_name(stock_code)
+    keywords = [stock_name, stock_code]
+
+    for article in news_list:
+        content = article.get('content', '').strip()
+        if not content:
+            content = article.get('summary', '').strip()
+
+        if not content:
+            article['extracted_content'] = ''
+            continue
+
+        # Try to extract context around keyword
+        snippet = extract_context_around_keyword(content, keywords, context_chars)
+
+        # Fallback: if keyword not found, use first N chars
+        if not snippet:
+            max_fallback = context_chars * 2
+            if len(content) > max_fallback:
+                snippet = content[:max_fallback] + "..."
+            else:
+                snippet = content
+
+        article['extracted_content'] = snippet
+
+    return news_list
 
 
 def get_trading_days_finlab(start_date: str, end_date: str) -> list:
@@ -185,7 +284,8 @@ def group_news_by_date(all_news: list) -> dict:
     return grouped
 
 
-def save_day_news(output_dir: Path, date_str: str, news_list: list) -> str:
+def save_day_news(output_dir: Path, date_str: str, news_list: list,
+                  stock_code: str, context_chars: int) -> str:
     """
     Save news for a trading day
 
@@ -193,10 +293,15 @@ def save_day_news(output_dir: Path, date_str: str, news_list: list) -> str:
         output_dir: Output directory
         date_str: Date string (YYYY-MM-DD)
         news_list: List of news articles
+        stock_code: Stock code for extracting relevant content
+        context_chars: Characters before/after keyword for extraction
 
     Returns:
         str: Saved file path
     """
+    # Add extracted_content to each article
+    news_with_extract = add_extracted_content(news_list, stock_code, context_chars)
+
     # Create output with metadata
     output = {
         "trading_day": date_str,
@@ -204,8 +309,8 @@ def save_day_news(output_dir: Path, date_str: str, news_list: list) -> str:
             "start": f"{date_str} 00:00:00",
             "end": f"{date_str} 23:59:59"
         },
-        "news_count": len(news_list),
-        "news": news_list
+        "news_count": len(news_with_extract),
+        "news": news_with_extract
     }
 
     # Save file
@@ -230,6 +335,8 @@ def main():
                         help='End date (YYYY-MM-DD)')
     parser.add_argument('--data-dir', type=str, default='data',
                         help='Data directory (default: data)')
+    parser.add_argument('--context-chars', type=int, default=150,
+                        help='Chars before/after stock mention for extracted_content (default: 150)')
     parser.add_argument('--index', type=str,
                         help='Custom index symbol for trading days (uses finlab 0050 for tw_stock by default)')
 
@@ -282,6 +389,7 @@ def main():
     output_dir = Path(args.data_dir) / "stocks" / args.category / "by_trading_day" / args.stock
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Output directory: {output_dir}")
+    print(f"Context chars: {args.context_chars}")
     print()
 
     # Save each trading day
@@ -292,7 +400,7 @@ def main():
 
     for i, date_str in enumerate(trading_days):
         news_list = grouped.get(date_str, [])
-        save_day_news(output_dir, date_str, news_list)
+        save_day_news(output_dir, date_str, news_list, args.stock, args.context_chars)
 
         if news_list:
             days_with_news += 1

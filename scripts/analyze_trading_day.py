@@ -64,9 +64,8 @@ def load_trading_day_data(data_dir: str, category: str, stock_code: str, model: 
             # Calculate total tokens using tiktoken
             total_tokens = 0
             for article in news_list:
-                title = article.get('title', '')
-                content = article.get('content', '')
-                total_tokens += count_tokens(title + content, encoder)
+                content = article.get('extracted_content', '')
+                total_tokens += count_tokens(content, encoder)
 
             data.append({
                 'date': datetime.strptime(trading_day, '%Y-%m-%d'),
