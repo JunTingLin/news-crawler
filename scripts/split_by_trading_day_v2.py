@@ -6,15 +6,16 @@ Split Stock News by Trading Day (V2)
 Splits filtered stock news into individual JSON files per trading day.
 Each file contains all news from that calendar day (00:00 ~ 23:59:59).
 
-Uses Yahoo Finance to get trading days (^TWII for Taiwan, ^DJIA for US, etc.)
+Uses finlab 0050 for Taiwan trading days, Yahoo Finance for US stocks.
 
 Usage:
     python scripts/split_by_trading_day_v2.py --stock 2330
     python scripts/split_by_trading_day_v2.py --stock 2330 --start 2024-01-01 --end 2024-12-31
-    python scripts/split_by_trading_day_v2.py --stock AAPL --category us_stock --index ^DJIA
+    python scripts/split_by_trading_day_v2.py --stock AAPL --category us_stock
 """
 
 import sys
+import os
 import argparse
 import json
 from datetime import datetime, timedelta
@@ -22,21 +23,48 @@ from pathlib import Path
 from collections import defaultdict
 
 import yfinance as yf
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
-# Default index for each category
-DEFAULT_INDEX = {
-    'tw_stock': '^TWII',
-    'us_stock': '^DJIA',
-}
+def get_trading_days_finlab(start_date: str, end_date: str) -> list:
+    """
+    Get list of trading days using finlab 0050 data
+
+    Args:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+
+    Returns:
+        list: List of trading day date strings (YYYY-MM-DD)
+    """
+    import finlab
+    from finlab import data
+
+    # Login to finlab
+    api_key = os.getenv('FINLAB_API_KEY')
+    if not api_key:
+        raise Exception("FINLAB_API_KEY not found in environment variables")
+    finlab.login(api_key)
+
+    # Get 0050 close price as trading day reference
+    close = data.get('price:收盤價')['0050']
+
+    # Filter by date range
+    mask = (close.index >= start_date) & (close.index <= end_date)
+    trading_days = close[mask].dropna().index
+
+    return sorted([d.strftime("%Y-%m-%d") for d in trading_days])
 
 
-def get_trading_days(index_symbol: str, start_date: str, end_date: str) -> list:
+def get_trading_days_yfinance(index_symbol: str, start_date: str, end_date: str) -> list:
     """
     Get list of trading days using Yahoo Finance
 
     Args:
-        index_symbol: Index symbol (e.g., ^TWII, ^DJIA)
+        index_symbol: Index symbol (e.g., ^DJIA)
         start_date: Start date in YYYY-MM-DD format
         end_date: End date in YYYY-MM-DD format
 
@@ -54,6 +82,28 @@ def get_trading_days(index_symbol: str, start_date: str, end_date: str) -> list:
         trading_days.append(ts.strftime("%Y-%m-%d"))
 
     return sorted(set(trading_days))
+
+
+def get_trading_days(category: str, start_date: str, end_date: str, index_symbol: str = None) -> list:
+    """
+    Get list of trading days based on category
+
+    Args:
+        category: Stock category (tw_stock, us_stock)
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        index_symbol: Optional custom index symbol for yfinance
+
+    Returns:
+        list: List of trading day date strings (YYYY-MM-DD)
+    """
+    if category == 'tw_stock' and index_symbol is None:
+        # Use finlab 0050 for Taiwan stocks
+        return get_trading_days_finlab(start_date, end_date)
+    else:
+        # Use Yahoo Finance for US stocks or custom index
+        symbol = index_symbol if index_symbol else '^DJIA'
+        return get_trading_days_yfinance(symbol, start_date, end_date)
 
 
 def load_stock_news(data_dir: str, category: str, stock_code: str) -> list:
@@ -181,17 +231,20 @@ def main():
     parser.add_argument('--data-dir', type=str, default='data',
                         help='Data directory (default: data)')
     parser.add_argument('--index', type=str,
-                        help='Index symbol for trading days (default: ^TWII for tw_stock, ^DJIA for us_stock)')
+                        help='Custom index symbol for trading days (uses finlab 0050 for tw_stock by default)')
 
     args = parser.parse_args()
 
-    # Determine index symbol
-    index_symbol = args.index if args.index else DEFAULT_INDEX.get(args.category, '^TWII')
+    # Determine trading day source
+    if args.category == 'tw_stock' and args.index is None:
+        trading_day_source = "finlab 0050"
+    else:
+        trading_day_source = args.index if args.index else "^DJIA"
 
     print("=" * 60)
     print(f"Split News by Trading Day (V2) - {args.stock}")
     print("=" * 60)
-    print(f"Trading day index: {index_symbol}")
+    print(f"Trading day source: {trading_day_source}")
     print()
 
     # Load stock news
@@ -219,9 +272,9 @@ def main():
     print(f"Date range: {start_date} ~ {end_date}")
     print()
 
-    # Get trading days from Yahoo Finance
-    print(f"Fetching trading days from Yahoo Finance ({index_symbol})...")
-    trading_days = get_trading_days(index_symbol, start_date, end_date)
+    # Get trading days
+    print(f"Fetching trading days ({trading_day_source})...")
+    trading_days = get_trading_days(args.category, start_date, end_date, args.index)
     print(f"Found {len(trading_days)} trading days")
     print()
 
@@ -257,7 +310,7 @@ def main():
     print("Summary")
     print("=" * 60)
     print(f"Stock: {args.stock}")
-    print(f"Index: {index_symbol}")
+    print(f"Trading day source: {trading_day_source}")
     print(f"Trading days: {len(trading_days)}")
     print(f"Days with news: {days_with_news}")
     print(f"Days without news: {days_without_news}")

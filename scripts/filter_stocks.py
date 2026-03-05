@@ -24,50 +24,70 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cnyes_crawler import CnyesCrawler
 
 
-# 2016-01-01~2025-12-31 intersect TWII stocks list
-# Format: "stock_code": ["code", "chinese_name"]
-# Using AND logic: both code and name must appear in the news
+# TWII 50 stocks list (47 stocks)
+# Format: "stock_code": (include_list, exclude_list)
+# - include_list: keywords to match (OR logic)
+# - exclude_list: keywords to exclude (OR logic), use [] if none
+# Match logic: (A OR B) AND NOT (C OR D)
 TWII_STOCKS = {
-    "1216": ["1216", "統一"],
-    "1301": ["1301", "台塑"],
-    "1303": ["1303", "南亞"],
-    "2002": ["2002", "中鋼"],
-    "2303": ["2303", "聯電"],
-    "2308": ["2308", "台達電"],
-    "2317": ["2317", "鴻海"],
-    "2330": ["2330", "台積電"],
-    "2357": ["2357", "華碩"],
-    "2382": ["2382", "廣達"],
-    "2395": ["2395", "研華"],
-    "2412": ["2412", "中華電"],
-    "2454": ["2454", "聯發科"],
-    "2880": ["2880", "華南金"],
-    "2881": ["2881", "富邦金"],
-    "2882": ["2882", "國泰金"],
-    "2884": ["2884", "玉山金"],
-    "2885": ["2885", "元大金"],
-    "2886": ["2886", "兆豐金"],
-    "2887": ["2887", "台新新光金"],
-    "2891": ["2891", "中信金"],
-    "2892": ["2892", "第一金"],
-    "2912": ["2912", "統一超"],
-    "3008": ["3008", "大立光"],
-    "3045": ["3045", "台灣大"],
-    "3711": ["3711", "日月光投控"],
-    "4904": ["4904", "遠傳"],
-    "5880": ["5880", "合庫金"],
-    "6505": ["6505", "台塑化"],
+    "1216": (["統一企業"], []),                # 統一企業
+    "1301": (["台塑"], ["台塑化"]),           # 台塑，排除台塑化
+    "1303": (["南亞"], ["南亞科"]),           # 南亞塑膠，排除南亞科
+    "2002": (["中鋼"], []),
+    "2059": (["川湖"], []),
+    "2207": (["和泰車"], []),
+    "2301": (["光寶科"], []),
+    "2303": (["聯電"], []),
+    "2308": (["台達電"], []),
+    "2317": (["鴻海"], []),
+    "2327": (["國巨"], []),
+    "2330": (["台積電"], []),
+    "2345": (["智邦"], []),
+    "2357": (["華碩"], []),
+    "2360": (["致茂"], []),
+    "2379": (["瑞昱"], []),
+    "2382": (["廣達"], []),
+    "2383": (["台光電"], []),
+    "2395": (["研華"], []),
+    "2408": (["南亞科"], []),
+    "2412": (["中華電"], []),
+    "2454": (["聯發科"], []),
+    "2603": (["長榮"], ["長榮航"]),           # 長榮海運，排除長榮航空
+    "2615": (["萬海"], []),
+    "2880": (["華南金"], []),
+    "2881": (["富邦金"], []),
+    "2882": (["國泰金"], []),
+    "2883": (["凱基金", "開發金"], []),
+    "2884": (["玉山金"], []),
+    "2885": (["元大金"], []),
+    "2886": (["兆豐金"], []),
+    "2887": (["台新金", "新光金"], []),
+    "2890": (["永豐金"], []),
+    "2891": (["中信金"], []),
+    "2892": (["第一金"], []),
+    "2912": (["統一超"], []),
+    "3008": (["大立光"], []),
+    "3017": (["奇鋐"], []),
+    "3034": (["聯詠"], []),
+    "3045": (["台灣大"], []),
+    "3231": (["緯創"], []),
+    "3653": (["健策"], []),
+    "3661": (["世芯"], []),
+    "3665": (["貿聯"], []),
+    "4904": (["遠傳"], []),
+    "5880": (["合庫金"], []),
+    "6505": (["台塑化"], []),
 }
 
 # US stock configurations
 US_STOCKS = {
-    "NVDA": ["NVDA"],
-    "TSLA": ["TSLA"],
-    "AAPL": ["AAPL"],
-    "MSFT": ["MSFT"],
-    "GOOGL": ["GOOGL"],
-    "META": ["META"],
-    "AMZN": ["AMZN"],
+    "AAPL": (["AAPL"], []),
+    "AMZN": (["AMZN"], []),
+    "GOOGL": (["GOOGL"], []),
+    "META": (["META"], []),
+    "MSFT": (["MSFT"], []),
+    "NVDA": (["NVDA"], []),
+    "TSLA": (["TSLA"], []),
 }
 
 # Title keywords to exclude (table-type articles with massive content)
@@ -334,9 +354,12 @@ def main():
 
     print("Articles by stock:")
     for stock_code, count in sorted_results:
-        keywords_list = stock_list[stock_code]
-        keywords_str = ', '.join(keywords_list)
-        print(f"  {stock_code:6s} ({keywords_str:20s}): {count:5,} articles")
+        keywords_tuple = stock_list[stock_code]
+        include_list, exclude_list = keywords_tuple
+        keywords_str = ', '.join(include_list)
+        if exclude_list:
+            keywords_str += f" (excl: {', '.join(exclude_list)})"
+        print(f"  {stock_code:6s} {keywords_str:30s}: {count:5,} articles")
 
     total_filtered = sum(results.values())
     print(f"\nTotal filtered: {total_filtered:,} articles")

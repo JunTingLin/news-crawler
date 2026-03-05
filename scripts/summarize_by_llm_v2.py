@@ -22,23 +22,27 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import tiktoken
 
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.filter_stocks import TWII_STOCKS
+
 # Load .env file
 load_dotenv()
 
 
-SYSTEM_PROMPT_TEMPLATE = """你是一位專業的財經新聞編輯。你的任務是用一句話總結與 {stock_id} 直接相關的新聞重點。
+SYSTEM_PROMPT_TEMPLATE = """你是一位專業的財經新聞編輯。你的任務是用一句話總結與 {stock_name} 相關的新聞重點。
 
 規則：
 1. 使用繁體中文
-2. 只提取與 {stock_id} 直接相關的資訊（如：該公司的營收、產品、人事、合作、法說會等）
+2. 只提取與 {stock_name} 相關的資訊（如：該公司的營收、產品、人事、合作、法說會等）
 3. 輸出一句簡潔的事實陳述，不超過100字
 """
 
-USER_PROMPT_TEMPLATE = """以下是 {stock_code} 在 {trading_day} 的相關新聞標題：
+USER_PROMPT_TEMPLATE = """以下是 {stock_name}({stock_code}) 在 {trading_day} 的相關新聞摘要：
 
-{news_titles}
+{news_summaries}
 
-請用一句話總結與 {stock_code} 直接相關的新聞重點："""
+請用一句話總結與 {stock_name} 直接相關的新聞重點："""
 
 
 def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
@@ -47,14 +51,22 @@ def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
     return len(encoder.encode(text))
 
 
-def format_news_titles(news_list: list) -> str:
-    """Format news titles for the prompt"""
-    titles = []
+def format_news_summaries(news_list: list) -> str:
+    """Format news summaries for the prompt"""
+    summaries = []
     for article in news_list:
-        title = article.get('title', '').strip()
-        if title:
-            titles.append(f"- {title}")
-    return "\n".join(titles)
+        summary = article.get('summary', '').strip()
+        if summary:
+            summaries.append(f"- {summary}")
+    return "\n".join(summaries)
+
+
+def get_stock_name(stock_code: str) -> str:
+    """Get stock name from TWII_STOCKS, fallback to stock_code"""
+    if stock_code in TWII_STOCKS:
+        include_list, _ = TWII_STOCKS[stock_code]
+        return include_list[0] if include_list else stock_code
+    return stock_code
 
 
 def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
@@ -78,17 +90,21 @@ def summarize_trading_day(client: OpenAI, model: str, stock_code: str,
             'output_tokens': 0
         }
 
-    # Format news titles only (not full content)
-    news_titles = format_news_titles(news_list)
+    # Get stock name
+    stock_name = get_stock_name(stock_code)
 
-    # Build system prompt with stock_id
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(stock_id=stock_code)
+    # Format news summaries
+    news_summaries = format_news_summaries(news_list)
+
+    # Build system prompt with stock_name
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(stock_name=stock_name)
 
     # Build user prompt
     user_prompt = USER_PROMPT_TEMPLATE.format(
+        stock_name=stock_name,
         stock_code=stock_code,
         trading_day=trading_day,
-        news_titles=news_titles
+        news_summaries=news_summaries
     )
 
     # Count input tokens

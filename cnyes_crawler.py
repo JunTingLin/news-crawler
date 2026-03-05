@@ -66,8 +66,10 @@ class CnyesCrawler:
             keyword: Can be:
                 - None: Match all news
                 - str: Single keyword (e.g., "台積電")
-                - list: Multiple keywords with AND logic (e.g., ["1216", "統一"])
-                       ALL keywords must appear in the combined text
+                - list: Multiple keywords with OR logic (e.g., ["台新金", "新光金"])
+                       ANY keyword appearing in the news will match
+                - tuple: (include_list, exclude_list) for include/exclude logic
+                       e.g., (["南亞"], ["南亞科"]) matches "南亞" but excludes "南亞科"
 
         Returns:
             bool: True if keyword matches
@@ -89,14 +91,29 @@ class CnyesCrawler:
             kw = keyword.lower()
             return kw in combined_text
 
-        # Multiple keywords matching (AND logic)
-        # ALL keywords must appear in the combined text
+        # Tuple format: (include_list, exclude_list)
+        elif isinstance(keyword, tuple) and len(keyword) == 2:
+            include_list, exclude_list = keyword
+
+            # Check exclude first - if any exclude keyword is found, return False
+            for ex_kw in exclude_list:
+                if ex_kw and ex_kw.lower() in combined_text:
+                    return False
+
+            # Check include - if any include keyword is found, return True
+            for in_kw in include_list:
+                if in_kw and in_kw.lower() in combined_text:
+                    return True
+
+            return False  # No include keywords found
+
+        # List format: Multiple keywords with OR logic
         elif isinstance(keyword, list):
             for kw in keyword:
                 kw_lower = kw.lower()
-                if kw_lower not in combined_text:
-                    return False  # If any keyword is missing, return False
-            return True  # All keywords found
+                if kw_lower in combined_text:
+                    return True  # If any keyword is found, return True
+            return False  # No keywords found
 
         return False
 
@@ -212,8 +229,10 @@ class CnyesCrawler:
             news_list: List of news items (from get_all_news())
             keyword: Keyword(s) to filter:
                 - str: Single keyword (e.g., "台積電")
-                - list: Multiple keywords with AND logic (e.g., ["1216", "統一"])
-                       ALL keywords must appear in the news
+                - list: Multiple keywords with OR logic (e.g., ["台新金", "新光金"])
+                       ANY keyword appearing in the news will match
+                - tuple: (include_list, exclude_list) for include/exclude logic
+                       e.g., (["南亞"], ["南亞科"]) matches "南亞" but excludes "南亞科"
             fetch_content: Whether to fetch full content from web page (default: False)
             delay: Delay between requests when fetching content (default: 0.5)
 
@@ -223,8 +242,13 @@ class CnyesCrawler:
         filtered = []
 
         # Display filter info
-        if isinstance(keyword, list):
-            print(f"Filtering keywords (AND): {' AND '.join(keyword)}")
+        if isinstance(keyword, tuple) and len(keyword) == 2:
+            include_list, exclude_list = keyword
+            include_str = ' OR '.join(include_list) if include_list else 'None'
+            exclude_str = ' OR '.join(exclude_list) if exclude_list else 'None'
+            print(f"Filtering: INCLUDE({include_str}) EXCLUDE({exclude_str})")
+        elif isinstance(keyword, list):
+            print(f"Filtering keywords (OR): {' OR '.join(keyword)}")
         else:
             print(f"Filtering keyword: {keyword}")
 
