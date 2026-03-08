@@ -35,7 +35,7 @@ load_dotenv()
 # Note for Ollama users: 172.18.48.1 is the Windows host IP from WSL
 # Check with: ip route | grep default
 DEFAULT_OLLAMA_URL = "http://172.18.48.1:11434/v1"
-DEFAULT_MODEL = "qwen2.5:14b"
+DEFAULT_MODEL = "hf.co/bartowski/Qwen2.5-14B-Instruct-GGUF:latest"
 
 
 SYSTEM_PROMPT_TEMPLATE = """你是一位專業的財經新聞編輯。你的任務是用一句話總結與 {stock_name} 相關的新聞重點。

@@ -155,9 +155,9 @@ def get_trading_days_finlab(start_date: str, end_date: str) -> list:
     # Get 0050 close price as trading day reference
     close = data.get('price:收盤價')['0050']
 
-    # Filter by date range
+    # Filter by date range (don't use dropna to avoid excluding days during stock splits)
     mask = (close.index >= start_date) & (close.index <= end_date)
-    trading_days = close[mask].dropna().index
+    trading_days = close[mask].index
 
     return sorted([d.strftime("%Y-%m-%d") for d in trading_days])
 

@@ -54,9 +54,11 @@ STOCKS=(
 START_DATE="2013-01-01"
 END_DATE="2025-12-31"
 
+WORKERS=4  # Parallel workers for faster processing
+
 for stock in "${STOCKS[@]}"; do
     echo "Summarizing $stock..."
-    python scripts/summarize_by_llm_v2.py --stock "$stock" --start "$START_DATE" --end "$END_DATE"
+    python scripts/summarize_by_llm_v2.py --stock "$stock" --start "$START_DATE" --end "$END_DATE" --workers "$WORKERS"
 done
 
 echo "Done!"
