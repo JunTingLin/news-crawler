@@ -30,7 +30,7 @@ from cnyes_crawler import CnyesCrawler
 # - exclude_list: keywords to exclude (OR logic), use [] if none
 # Match logic: (A OR B) AND NOT (C OR D)
 TWII_STOCKS = {
-    "1216": (["統一企業"], []),                # 統一企業
+    "1216": (["統一企業", "統一(1216", "1216-TW"], ["統一超", "統一發票"]),  # 統一企業
     "1301": (["台塑"], ["台塑化"]),           # 台塑，排除台塑化
     "1303": (["南亞"], ["南亞科"]),           # 南亞塑膠，排除南亞科
     "2002": (["中鋼"], []),

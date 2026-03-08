@@ -100,8 +100,12 @@ def add_extracted_content(news_list: list, stock_code: str, context_chars: int =
     Returns:
         List with extracted_content added to each article
     """
-    stock_name = get_stock_name(stock_code)
-    keywords = [stock_name, stock_code]
+    # Use all keywords from TWII_STOCKS include_list + stock_code
+    if stock_code in TWII_STOCKS:
+        include_list, _ = TWII_STOCKS[stock_code]
+        keywords = list(include_list) + [stock_code]
+    else:
+        keywords = [stock_code]
 
     for article in news_list:
         content = article.get('content', '').strip()
