@@ -1,36 +1,37 @@
 #!/bin/bash
-# Batch summarize trading day news with LLM (one sentence) for DJIA component stocks (29 stocks)
+# Batch summarize trading day news with LLM for DJIA component stocks (30 stocks)
 
 STOCKS=(
-    UNH    # UnitedHealth Group
-    GS     # Goldman Sachs
-    MSFT   # Microsoft
-    HD     # The Home Depot
-    CAT    # Caterpillar
-    AMGN   # Amgen
-    MCD    # McDonald's
-    CRM    # Salesforce.com
-    V      # Visa
-    AXP    # American Express
-    TRV    # Travelers
     AAPL   # Apple
-    JPM    # JPMorgan Chase
-    IBM    # IBM
-    HON    # Honeywell International
+    AMGN   # Amgen
     AMZN   # Amazon
-    PG     # Procter & Gamble
-    JNJ    # Johnson & Johnson
+    AXP    # American Express
     BA     # Boeing
-    CVX    # Chevron
-    MMM    # 3M
-    MRK    # Merck Sharp & Dohme
-    DIS    # Walt Disney
-    WMT    # Walmart Inc
-    NKE    # Nike
-    KO     # Coca-Cola
+    CAT    # Caterpillar
+    CRM    # Salesforce
     CSCO   # Cisco Systems
+    CVX    # Chevron
+    DIS    # Walt Disney
+    GS     # Goldman Sachs
+    HD     # The Home Depot
+    HON    # Honeywell International
+    IBM    # IBM
+    JNJ    # Johnson & Johnson
+    JPM    # JPMorgan Chase
+    KO     # Coca-Cola
+    MCD    # McDonald's
+    MMM    # 3M
+    MRK    # Merck
+    MSFT   # Microsoft
+    NKE    # Nike
+    NVDA   # NVIDIA
+    PG     # Procter & Gamble
+    SHW    # Sherwin-Williams
+    TRV    # Travelers
+    UNH    # UnitedHealth Group
+    V      # Visa
     VZ     # Verizon
-    INTC   # Intel
+    WMT    # Walmart
 )
 
 START_DATE="2013-01-01"
