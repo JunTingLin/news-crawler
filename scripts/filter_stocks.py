@@ -79,15 +79,39 @@ TWII_STOCKS = {
     "6505": (["台塑化"], []),
 }
 
-# US stock configurations
+# DJIA 30 stocks (29 stocks - note: DOW was removed from DJIA)
+# Format: "stock_code": (include_list, exclude_list)
+# Using company names + ticker-US format for precision
 US_STOCKS = {
-    "AAPL": (["AAPL"], []),
-    "AMZN": (["AMZN"], []),
-    "GOOGL": (["GOOGL"], []),
-    "META": (["META"], []),
-    "MSFT": (["MSFT"], []),
-    "NVDA": (["NVDA"], []),
-    "TSLA": (["TSLA"], []),
+    "UNH": (["UnitedHealth", "聯合健康", "UNH-US"], []),
+    "GS": (["Goldman Sachs", "高盛", "GS-US"], []),
+    "MSFT": (["Microsoft", "微軟", "MSFT-US"], []),
+    "HD": (["Home Depot", "家得寶", "HD-US"], []),
+    "CAT": (["Caterpillar", "開拓重工", "卡特彼勒", "CAT-US"], []),
+    "AMGN": (["Amgen", "安進", "AMGN-US"], []),
+    "MCD": (["McDonald", "麥當勞", "MCD-US"], []),
+    "CRM": (["Salesforce", "賽富時", "CRM-US"], []),
+    "V": (["Visa", "威士卡", "V-US"], []),
+    "AXP": (["American Express", "美國運通", "AXP-US"], []),
+    "TRV": (["Travelers", "旅行家", "TRV-US"], []),
+    "AAPL": (["Apple", "蘋果", "AAPL-US"], []),
+    "JPM": (["JPMorgan", "摩根大通", "JPM-US"], []),
+    "IBM": (["IBM", "IBM-US"], []),
+    "HON": (["Honeywell", "漢威聯合", "霍尼韋爾", "HON-US"], []),
+    "AMZN": (["Amazon", "亞馬遜", "AMZN-US"], []),
+    "PG": (["Procter & Gamble", "寶僑", "P&G", "PG-US"], []),
+    "JNJ": (["Johnson & Johnson", "嬌生", "JNJ-US"], []),
+    "BA": (["Boeing", "波音", "BA-US"], []),
+    "CVX": (["Chevron", "雪佛龍", "CVX-US"], []),
+    "MMM": (["3M", "MMM-US"], []),
+    "MRK": (["Merck", "默克", "默沙東", "MRK-US"], []),
+    "DIS": (["Disney", "迪士尼", "DIS-US"], []),
+    "WMT": (["Walmart", "沃爾瑪", "WMT-US"], []),
+    "NKE": (["Nike", "耐吉", "耐克", "NKE-US"], []),
+    "KO": (["Coca-Cola", "可口可樂", "KO-US"], []),
+    "CSCO": (["Cisco", "思科", "CSCO-US"], []),
+    "VZ": (["Verizon", "威瑞森", "VZ-US"], []),
+    "INTC": (["Intel", "英特爾", "INTC-US"], []),
 }
 
 # Title keywords to exclude (table-type articles with massive content)

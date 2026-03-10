@@ -27,16 +27,19 @@ from dotenv import load_dotenv
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from scripts.filter_stocks import TWII_STOCKS
+from scripts.filter_stocks import TWII_STOCKS, US_STOCKS
 
 # Load environment variables
 load_dotenv()
 
 
 def get_stock_name(stock_code: str) -> str:
-    """Get stock name from TWII_STOCKS, fallback to stock_code"""
+    """Get stock name from TWII_STOCKS or US_STOCKS, fallback to stock_code"""
     if stock_code in TWII_STOCKS:
         include_list, _ = TWII_STOCKS[stock_code]
+        return include_list[0] if include_list else stock_code
+    if stock_code in US_STOCKS:
+        include_list, _ = US_STOCKS[stock_code]
         return include_list[0] if include_list else stock_code
     return stock_code
 
@@ -100,9 +103,12 @@ def add_extracted_content(news_list: list, stock_code: str, context_chars: int =
     Returns:
         List with extracted_content added to each article
     """
-    # Use all keywords from TWII_STOCKS include_list + stock_code
+    # Use all keywords from TWII_STOCKS or US_STOCKS include_list + stock_code
     if stock_code in TWII_STOCKS:
         include_list, _ = TWII_STOCKS[stock_code]
+        keywords = list(include_list) + [stock_code]
+    elif stock_code in US_STOCKS:
+        include_list, _ = US_STOCKS[stock_code]
         keywords = list(include_list) + [stock_code]
     else:
         keywords = [stock_code]
@@ -205,7 +211,7 @@ def get_trading_days(category: str, start_date: str, end_date: str, index_symbol
         return get_trading_days_finlab(start_date, end_date)
     else:
         # Use Yahoo Finance for US stocks or custom index
-        symbol = index_symbol if index_symbol else '^DJIA'
+        symbol = index_symbol if index_symbol else '^DJI'
         return get_trading_days_yfinance(symbol, start_date, end_date)
 
 
@@ -350,7 +356,7 @@ def main():
     if args.category == 'tw_stock' and args.index is None:
         trading_day_source = "finlab 0050"
     else:
-        trading_day_source = args.index if args.index else "^DJIA"
+        trading_day_source = args.index if args.index else "^DJI"
 
     print("=" * 60)
     print(f"Split News by Trading Day (V2) - {args.stock}")
