@@ -24,12 +24,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cnyes_crawler import CnyesCrawler
 
 
-# TWII 50 stocks list (47 stocks)
+# TWII 50 stocks list (48 stocks)
 # Format: "stock_code": (include_list, exclude_list)
 # - include_list: keywords to match (OR logic)
 # - exclude_list: keywords to exclude (OR logic), use [] if none
 # Match logic: (A OR B) AND NOT (C OR D)
 TWII_STOCKS = {
+    "0050": (["0050", "元大台灣50", "元大50", "台灣50", "加權指數"], []),  # 元大台灣50 ETF / 大盤指數
     "1216": (["統一企業", "統一(1216", "1216-TW"], ["統一超", "統一發票"]),  # 統一企業
     "1301": (["台塑"], ["台塑化"]),           # 台塑，排除台塑化
     "1303": (["南亞"], ["南亞科"]),           # 南亞塑膠，排除南亞科
