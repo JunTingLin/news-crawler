@@ -1,13 +1,19 @@
-# Cnyes News Crawler
+# News Crawler
 
-A news crawler for cnyes.com with stock filtering and LLM summarization.
+A news crawler supporting Cnyes and EBSCO Newspaper Source, with stock filtering and LLM summarization.
+
+## Data Sources
+
+| Source | Description | Access |
+|--------|-------------|--------|
+| Cnyes | Taiwan financial news | Public API |
+| EBSCO Newspaper Source | International newspapers | NTU VPN required |
 
 ## Pipeline
 
 ```
 1. Crawl          2. Filter           3. Split              4. Analyze          5. Summarize
    Raw News   -->    by Stock    -->    by Trading Day  -->    Distribution  -->    with LLM
-   (cnyes)         (2330, NVDA)        (per day JSON)        (chart + stats)       (GPT-4o-mini)
 ```
 
 ## Quick Start
@@ -16,25 +22,62 @@ A news crawler for cnyes.com with stock filtering and LLM summarization.
 # Setup
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+playwright install chromium  # For EBSCO crawler
 cp .env.example .env  # Add your API keys
+```
 
-# Run pipeline
+## Cnyes News Crawler
+
+```bash
+# Crawl Taiwan stock news
 python scripts/crawl_news.py --category tw_stock --start 2016-01-01 --end 2025-12-31
 
+# Filter by stock code
 python scripts/filter_stocks.py --category tw_stock --start 2016-01-01 --end 2025-12-31 --stock 2330
 
+# Split by trading day
 python scripts/split_by_trading_day_v2.py --stock 2330
 
+# Analyze distribution
 python scripts/analyze_trading_day.py --stock 2330
 
-python scripts/summarize_by_llm.py --stock 2330 --start 2025-01-01 --end 2025-12-31
+# Summarize with LLM
+python scripts/summarize_by_llm_v2.py --stock 2330 --start 2025-01-01 --end 2025-12-31
 ```
+
+## EBSCO News Crawler
+
+Crawl US stock news from EBSCO Newspaper Source (Dow Jones 30 components).
+
+**Requirements:**
+- NTU VPN connection (2-hour session limit)
+- Playwright browser automation
+
+```bash
+# Crawl single stock
+python scripts/crawl_ebsco_news.py --stock AAPL --start 2016-01-01 --end 2025-12-31 --headless
+
+# Crawl all 30 Dow Jones stocks
+python scripts/crawl_ebsco_news.py --all --start 2016-01-01 --end 2025-12-31 --headless
+
+# Force re-crawl existing stocks
+python scripts/crawl_ebsco_news.py --stock AAPL --start 2016-01-01 --end 2025-12-31 --headless --force
+```
+
+**Features:**
+- Monthly partitioning for large date ranges
+- Automatic batch downloading (50 records per batch due to EBSCO limit)
+- CSV export with deduplication
+- Supports Chinese locale (Taiwan University interface)
+
+**Output:** `data/ebsco_news/{STOCK}.csv`
 
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
-| `crawl_news.py` | Crawl raw news from cnyes.com |
+| `crawl_news.py` | Crawl news from Cnyes |
+| `crawl_ebsco_news.py` | Crawl news from EBSCO Newspaper Source |
 | `filter_stocks.py` | Filter news by stock code |
 | `split_by_trading_day.py` | Split by trading window (prev close ~ today open) |
 | `split_by_trading_day_v2.py` | Split by trading day (full day 00:00 ~ 23:59) |
@@ -42,104 +85,52 @@ python scripts/summarize_by_llm.py --stock 2330 --start 2025-01-01 --end 2025-12
 | `summarize_by_llm.py` | Summarize daily news (1-3 paragraphs) |
 | `summarize_by_llm_v2.py` | Summarize daily news (one sentence) |
 
-### Batch Scripts (TWII 29 Stocks)
-
-| Script | Description |
-|--------|-------------|
-| `batch_filter_stocks.sh` | Filter all 29 TWII component stocks |
-| `batch_split_trading_day_v2.sh` | Split all 29 stocks by trading day |
-| `batch_analyze_trading_day.sh` | Analyze news distribution for all 29 stocks |
-| `batch_summarize_by_llm_v2.sh` | Summarize all 29 stocks with LLM (one sentence) |
-
 ## Data Structure
 
 ```
 data/
-├── raw_tw_stock/                    # Raw crawled news
+├── raw_tw_stock/                    # Cnyes raw news
 │   └── 2024/01/20240102.json
 │
-└── stocks/tw_stock/
-    ├── 1216/                        # Filtered stock news
-    │   └── 201601_202512.json
-    ├── 2330/
-    │   └── 201601_202512.json
-    ├── analysis/                    # Analysis charts
-    │   ├── 1216/
-    │   │   └── news_distribution.png
-    │   └── 2330/
-    │       └── news_distribution.png
-    ├── by_trading_day/              # Split by trading day
-    │   ├── 1216/
-    │   │   ├── 2024-01-02.json
-    │   │   └── ...
-    │   └── 2330/
-    │       └── ...
-    ├── summaries/                   # LLM summaries (1-3 paragraphs)
-    │   ├── 1216/
-    │   │   ├── 2024-01-02.json
-    │   │   └── ...
-    │   └── 2330/
-    │       └── ...
-    └── summaries_v2/                # LLM summaries (one sentence)
-        ├── 1216/
-        │   ├── 2024-01-02.json
-        │   └── ...
-        └── 2330/
-            └── ...
+├── stocks/
+│   ├── tw_stock/                    # Taiwan stocks
+│   │   ├── 2330/
+│   │   │   └── 201601_202512.json
+│   │   ├── analysis/
+│   │   ├── by_trading_day/
+│   │   └── summaries_v2/
+│   │
+│   └── us_stock/                    # US stocks
+│       └── analysis/
+│
+└── ebsco_news/                      # EBSCO news
+    ├── AAPL.csv
+    ├── MSFT.csv
+    └── ...
 ```
 
-## Command Reference
+## Dow Jones 30 Stocks
 
-### crawl_news.py
-```bash
-python scripts/crawl_news.py --category tw_stock --start 2016-01-01 --end 2025-12-31
+The EBSCO crawler supports all 30 Dow Jones Industrial Average components:
+
 ```
-
-### filter_stocks.py
-```bash
-python scripts/filter_stocks.py --category tw_stock --start 2016-01-01 --end 2025-12-31 --stock 2330
-```
-
-### split_by_trading_day.py (prev close ~ today open)
-```bash
-python scripts/split_by_trading_day.py --stock 2330
-```
-
-### split_by_trading_day_v2.py (full day)
-```bash
-# Taiwan stocks (uses ^TWII)
-python scripts/split_by_trading_day_v2.py --stock 2330
-
-# US stocks (uses ^DJIA)
-python scripts/split_by_trading_day_v2.py --stock AAPL --category us_stock
-
-# Custom index
-python scripts/split_by_trading_day_v2.py --stock 2330 --index ^TWII
-```
-
-### analyze_trading_day.py
-```bash
-python scripts/analyze_trading_day.py --stock 2330 --threshold 15
-```
-
-### summarize_by_llm.py (1-3 paragraphs)
-```bash
-python scripts/summarize_by_llm.py --stock 2330 --start 2025-01-01 --end 2025-12-31
-python scripts/summarize_by_llm.py --stock 2330 --dry-run  # Preview without API calls
-```
-
-### summarize_by_llm_v2.py (one sentence)
-```bash
-python scripts/summarize_by_llm_v2.py --stock 2330 --start 2025-01-01 --end 2025-12-31
-python scripts/summarize_by_llm_v2.py --stock 2330 --dry-run
+AAPL, AMGN, AMZN, AXP, BA, CAT, CRM, CSCO, CVX, DIS,
+GS, HD, HON, IBM, JNJ, JPM, KO, MCD, MMM, MRK,
+MSFT, NKE, NVDA, PG, SHW, TRV, UNH, V, VZ, WMT
 ```
 
 ## Environment Variables
 
-Create `.env` file (see `.env.example`):
+Create `.env` file:
 ```
 OPENAI_API_KEY=your_openai_key
 ```
+
+## Notes
+
+- **VPN Timeout:** NTU VPN has a 2-hour session limit. For large crawls, you may need multiple sessions.
+- **EBSCO Rate:** Each month takes ~5-6 minutes to crawl (~800 records).
+- **Full Crawl:** 120 months (2016-2025) for one stock takes ~12 hours.
 
 ## License
 
